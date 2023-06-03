@@ -101,7 +101,7 @@ class Mark {
         }
         if (Array.isArray(data.poly_path)) {
             data.poly_path.forEach(elements => {
-                if (Array.isArray(element) && element.length = 2) {
+                if (Array.isArray(element) && element.length == 2) {
                     this.poly_path.push(parseInt(element[0], parseInt(element[1])));
                 }
             });
