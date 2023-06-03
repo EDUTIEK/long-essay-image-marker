@@ -25,7 +25,7 @@ class Mark {
      * Color of the mark
      * @type {string}
      */
-    color: '#D8E5F4';
+    color = '#D8E5F4';
 
 
     /**
