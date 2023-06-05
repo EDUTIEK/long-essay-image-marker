@@ -86,7 +86,7 @@ class ImageMarker {
     /**
      * Update the label of a mark.
      * Labels are created and changed outside the ImageMarker.
-     * They are sorted by position on the page and may be relabled when a mark is created or deleted.
+     * They are externally sorted by position on the page and may be updated when a mark is created or deleted.
      * A label is only shown when a mark is selected. In that case it needs to be redrawn.
      *
      * @param {string} key
