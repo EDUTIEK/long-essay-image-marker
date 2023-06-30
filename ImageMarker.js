@@ -419,7 +419,9 @@ const newPolygon = (root, event) => acquireStatus(root, {name: 'newPolygon'}, re
 
 const addInteractions = root => {
     root.nodes.svg.addEventListener('mousedown', event => {
-        [root.nodes.svg, root.nodes.backgroundImage].includes(event.target) && drawNewGroup(root, event);
+        const isBackground = [root.nodes.svg, root.nodes.backgroundImage].includes(event.target);
+        const isLeftClick = event.button === 0;
+        isBackground && isLeftClick && drawNewGroup(root, event);
     });
 };
 
@@ -506,7 +508,7 @@ export default (parent, onCreation, onSelection) => {
         showPage: (url, marks) => {
             showImage(root.nodes.backgroundImage, rootRect(root), url);
             add(root.nodes.layers.background, root.nodes.backgroundImage);
-            marks.forEach(addMark);
+            marks.forEach(compose(curry(addMark, root), createMark));
         },
         addMark: mark => addMark(root, createMark(mark)),
         removeMark: key => {
@@ -517,7 +519,7 @@ export default (parent, onCreation, onSelection) => {
         updateMark: mark => updateMark(root, createMark(mark)),
         setDefaultColor: color => root.creation.color(color),
         setDefaultShape: shape => {
-            Object.keys(SHAPES).includes(shape) || error(`Invalid shape name: ${shape}.`);
+            Object.values(SHAPES).includes(shape) || error(`Invalid shape name: ${shape}.`);
             root.creation.shape(shape);
         },
     };
