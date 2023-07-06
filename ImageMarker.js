@@ -1,5 +1,7 @@
 import createMark, { SHAPES } from './Mark';
-import { isUndefined, compose, fitInRect, willFollowMouseDown, mousePoint, subtractPoint, addPoint, diff, set, remove, curry, methodArgsFromObject, tap, isObject, error, Void, only, point, rectFromPoints, any, always, isArray, pointInRect, relativePointsAsString, ignoreFirstCall, ref, mapObject } from './utils';
+import { isUndefined, compose, fitInRect, willFollowMouseDown, mousePoint, subtractPoint, addPoint, diff, set, remove, curry, methodArgsFromObject, tap, isObject, error, Void, only, point, rectFromPoints, any, always, isArray, pointInRect, relativePointsAsString, ignoreFirstCall, ref, mapObject, pointAsSize, sizeAsPoint, multiplyPoint, isNumber, size, assert, rotatePoint } from './utils';
+
+const pattern = size(5, 4);
 
 const pathOfDiff = set => set.reduce((l, c) => isObject(c.right) && !isArray(c.right) ? [
     ...l,
@@ -29,11 +31,12 @@ const neverChange = (value, action) => ({
 
 const onChangeValues = (structure, action) => ({
     requires: path => any(curry(pathBeginsWith, path), Object.values(structure)),
-    then: compose(action, curry(only, Object.keys(structure))),
+    then: obj => action(mapObject(path => findPath(path, obj), structure)),
 });
 
-const setAttribute = name => value => node => node.setAttribute(name, value);
+const setAttribute = name => value => node => node.setAttribute(name, isNumber(value) ? (value) : value);
 const setText = () => value => node => set(node, 'textContent', value);
+const setStyleAttribute = name => value => node => node.style.setProperty(name, value);
 
 const removeDuplicates = a => a.reduce((l, x) => l.includes(x) ? l : [...l, x], []);
 
@@ -84,7 +87,7 @@ const createLock = () => {
 
     return then => {
         if (locked !== null) {
-            return false;
+            return new Promise(Void);
         }
         const newLock = () => {
             if (locked === newLock) {
@@ -94,8 +97,10 @@ const createLock = () => {
             return false;
         };
         locked = newLock;
-        then(newLock);
-        return true;
+        return new Promise(resolve => then(() => {
+            newLock();
+            resolve();
+        }));
     };
 };
 
@@ -104,17 +109,15 @@ const createStatus = status => {
 
     return {
         current: () => status,
-        acquire: (newStatus, then) => {
-            lock(release => {
-                const oldStatus = status;
-                status = newStatus;
-                then(() => {
-                    if (release()) {
-                        status = oldStatus;
-                    }
-                });
+        acquire: (newStatus, then) => lock(release => {
+            const oldStatus = status;
+            status = newStatus;
+            then(() => {
+                if (release()) {
+                    status = oldStatus;
+                }
             });
-        }
+        }),
     };
 };
 
@@ -131,9 +134,34 @@ const labelDefinition = [
 ];
 
 const definitionForAllShapes = [
-    onChange(['color'], setAttribute('fill')),
+    onChange(['color'], setStyleAttribute('--default-color')),
+    onChange(['selectedColor'], setStyleAttribute('--selected-color')),
     neverChange('shape', setAttribute('class')),
 ];
+
+const createLineLikeShape = lineHeight => {
+    const offset = select => ({start, end}) => select(start, start + end);
+    const vectorLength = point => Math.sqrt(Math.pow(point.x, 2) + Math.pow(point.y, 2));
+
+    const transform = ({start, end}) => {
+        const half = Math.atan(end.y / end.x);
+        const rad = end.x < 0 ? half - Math.PI : half;
+        const pos = rotatePoint(subtractPoint(start, point(0, lineHeight / 2)), -rad);
+        const rotate = `rotateZ(${rad}rad)`;
+        const translate = `translate(${pos.x}px, ${pos.y}px)`;
+        return `${rotate} ${translate}`;
+    };
+
+    return [
+        ...definitionForAllShapes,
+        onChangeValues({start: ['pos'], end: ['end']}, compose(setStyleAttribute('transform'), transform)),
+        onChange(['end'], compose(setAttribute('width'), vectorLength)),
+        neverChange(`0 ${lineHeight / 2}px`, setStyleAttribute('transform-origin')),
+        neverChange(lineHeight, setAttribute('height')),
+        neverChange(0, setAttribute('x')),
+        neverChange(0, setAttribute('y')),
+    ];
+};
 
 const shapeDefinition = {
     [SHAPES.RECTANGLE]: [
@@ -155,7 +183,12 @@ const shapeDefinition = {
             pos: ['pos'],
             polygon: ['polygon'],
         }, setPolygonPoints),
-    ]
+    ],
+    [SHAPES.LINE]: createLineLikeShape(1),
+    [SHAPES.WAVE]: [
+        ...createLineLikeShape(pattern.height),
+        neverChange('shape wave', setAttribute('class'))
+    ],
 };
 
 const createShape = val => {
@@ -179,6 +212,8 @@ const nodeNameOfShape = name => ({
     [SHAPES.RECTANGLE]: 'rect',
     [SHAPES.CIRCLE]: 'circle',
     [SHAPES.POLYGON]: 'polygon',
+    [SHAPES.LINE]: 'rect',
+    [SHAPES.WAVE]: 'rect',
 })[name] || error(`Invalid shape name: ${name}.`);
 
 const groupFromMark = mark => ({
@@ -194,40 +229,48 @@ const defaultMarkValues = {
     [SHAPES.RECTANGLE]: {width: 5, height: 5},
     [SHAPES.CIRCLE]: {},
     [SHAPES.POLYGON]: {polygon: [point(0, 0)]},
+    [SHAPES.LINE]: {end: point(0, 0)},
+    [SHAPES.WAVE]: {end: point(0, 0)},
 };
 
-const createMarkAtPoint = (pos, shape, color) => createMark({
+const createMarkAtPoint = (pos, shape, color, selectedColor) => createMark({
     ...defaultMarkValues[shape],
     shape,
     pos,
     color,
+    selectedColor,
     label: '',
 });
 
 const loadImage = url => new Promise((resolve, reject) => {
     const image = document.createElement('img');
-    image.onload = () => resolve(image);
+    image.onload = () => resolve(size(image.width, image.height));
     image.onerror = reject;
     image.src = url;
 });
 
-const showImage = (img, rect, url) => loadImage(url).then(imageSize => {
+const showImage = (root, rect, url) => loadImage(url).then(imageSize => {
     const size = fitInRect(imageSize, rect);
-    setAttributes(img, {
+    setAttributes(root.nodes.backgroundImage, {
         href: url,
         x: 0,
         y: 0,
-        ...size,
+        ...imageSize,
     });
+    root.canvas.size(imageSize);
+    updateView(root);
 });
 
 const createStyle = () => tap(style => set(
     style,
     'innerHTML',
-    '.hej {position: relative; width: 100%; height: 100%;} ' +
+    '.hej {position: relative; width: 100%; height: 100%; overflow: auto;} ' +
     'svg .polygon-start:hover {stroke: blue;} ' +
+    'svg {position: absolute;}' +
     'svg * {user-select: none;} ' +
-    'svg .foreground .shape {fill: rgba(255, 0, 0, 0.5);}'
+    'svg .shape {fill: var(--default-color);}' +
+    'svg .shape.wave {mask: url(#wave-mask);}' +
+    'svg .foreground .shape {fill: var(--selected-color);}'
 ))(document.createElement('style'));
 
 const createLayers = () => ({
@@ -236,6 +279,16 @@ const createLayers = () => ({
     foreground: buildSvg('g', {'class': 'foreground'}),
 });
 
+const assertShapeName = shape => assert(
+    Object.values(SHAPES).includes(shape),
+    `Invalid shape name: ${shape}.`
+);
+
+const assertValidScale = scale => {
+    assert(isNumber(level), `Level must be a number, given: ${JSON.stringify(level)}.`);
+    assert(level > 0, `Level must be > 0 given: ${level}.`);
+};
+
 const createRoot = (parent, createMark, selectMark) => {
     const layers = createLayers();
     const svg = buildSvg('svg', {width: '100%', height: '100%'}, ...Object.values(layers));
@@ -243,6 +296,7 @@ const createRoot = (parent, createMark, selectMark) => {
     const backgroundImage = svgElement('image');
     add(parent, app);
     add(parent, createStyle());
+    add(svg, buildSvg('defs', {}, wavePattern(), waveMask()));
 
     return {
         nodes: {
@@ -253,9 +307,14 @@ const createRoot = (parent, createMark, selectMark) => {
         },
         creation: {
             color: ref('#0000AAAA'),
-            shape: ref(SHAPES.RECTANGLE),
+            selectedColor: ref('#FF0000AA'),
+            shape: ref(SHAPES.WAVE, assertShapeName),
         },
         status: createStatus({name: 'idle'}),
+        canvas: {
+            scale: ref(1, assertValidScale),
+            size: ref(null),
+        },
         groups: {},
         emit: {createMark, selectMark},
     };
@@ -263,7 +322,7 @@ const createRoot = (parent, createMark, selectMark) => {
 
 const moveGroup = (root, group, event) => acquireGroupStatus(root, 'moveGroup', group, release => untilMouseUp(event, {
     start: mouse => {
-        forceSelect(root, group);
+        forceSelectSilently(root, group);
         return {
             mouse,
             pos: group.mark.pos,
@@ -302,19 +361,38 @@ const attachShape = (root, group) => {
     addGroupInteractionsFor(root, group, group.nodes.shape);
 };
 
-const editRectangle = (root, group, event) => acquireGroupStatus(root, 'editGroup', group, release => untilMouseUp(event, {
+const editLineLike = (root, group, event) => acquireGroupStatus(root, 'editGroup', group, release => untilMouseUp(event, {
     start: mouse => {
-        forceSelect(root, group);
-        return {mark: group.mark, start: {mouse, shape: group.mark.pos}};
+        forceSelectSilently(root, group);
+        mouse = globalToSvgPoint(root, mouse);
+        return {mark: group.mark, start: {mouse, pos: group.mark.pos}};
     },
     move: (mouse, {mark: oldMark, start}) => {
-        const diff = subtractPoint(mouse, start.mouse);
-        const {width, height, ...pos} = rectFromPoints(start.shape, addPoint(start.shape, diff));
+        const diff = subtractPoint(globalToSvgPoint(root, mouse), start.mouse);
         const mark = {
             ...oldMark,
+            end: diff,
+        };
+        updateMark(root, mark);
+        return {start, mark};
+    },
+    stop: release,
+}));
+
+const editRectangle = (root, group, event) => acquireGroupStatus(root, 'editGroup', group, release => untilMouseUp(event, {
+    start: mouse => {
+        forceSelectSilently(root, group);
+        mouse = globalToSvgPoint(root, mouse);
+        return {mark: group.mark, start: {mouse, pos: group.mark.pos}};
+    },
+    move: (mouse, {mark: oldMark, start}) => {
+        const diff = subtractPoint(globalToSvgPoint(root, mouse), start.mouse);
+        const {width, height, ...pos} = rectFromPoints(start.pos, addPoint(start.pos, diff));
+        const mark = {
+            ...oldMark,
+            pos,
             width,
             height,
-            pos,
         };
         updateMark(root, mark);
         return {start, mark};
@@ -324,15 +402,15 @@ const editRectangle = (root, group, event) => acquireGroupStatus(root, 'editGrou
 
 const editCircle = (root, group, event) => acquireGroupStatus(root, 'editGroup', group, release => untilMouseUp(event, {
     start: mouse => {
-        const pos = subtractPoint(mouse, rootRect(root));
-        forceSelect(root, group);
-        return {mark: group.mark, start: {shape: group.mark.pos, mouse}};
+        mouse = globalToSvgPoint(root, mouse);
+        forceSelectSilently(root, group);
+        return {mark: group.mark, start: {pos: group.mark.pos, mouse}};
     },
     move: (mouse, {mark: oldMark, start}) => {
-        const diff = subtractPoint(mouse, start.mouse);
+        const diff = subtractPoint(globalToSvgPoint(root, mouse), start.mouse);
         const mark = {
             ...oldMark,
-            pos: addPoint(start.shape, diff),
+            pos: addPoint(start.pos, diff),
         };
         updateMark(root, mark);
         return {start, mark};
@@ -340,10 +418,10 @@ const editCircle = (root, group, event) => acquireGroupStatus(root, 'editGroup',
     stop: release,
 }));
 
-const createPolygonFrame = (parent, relativeStart) => {
+const createPolygonFrame = (parent, start, finish) => {
     const finishDot = buildSvg('circle', {
-        cx: relativeStart.x,
-        cy: relativeStart.y,
+        cx: start.x,
+        cy: start.y,
         r: 6,
         fill: 'lightblue',
         'class': 'polygon-start',
@@ -360,31 +438,39 @@ const createPolygonFrame = (parent, relativeStart) => {
     add(root, finishDot);
     add(parent, root);
 
-    return {
-        remove: () => root.remove(),
-        setPath: points => setAttributes(path, {
-            points: relativePointsAsString(points, relativeStart)
-        })
-    };
-};
-
-const polygonMouseMove = (frame, absoluteStart, polygon) => event => {
-    const mouse = mousePoint(event);
-    frame.setPath([...polygon(), subtractPoint(mouse, absoluteStart)]);
-};
-
-const addPolygonPoint = (absoluteStart, pushPoint, finish) => event => {
-    const rect = rectFromPoints(
-        addPoint(absoluteStart, point(-5, -5)),
-        addPoint(absoluteStart, point(5, 5))
-    );
-    const mouse = mousePoint(event);
-    if (pointInRect(mouse, rect)) {
+    finishDot.addEventListener('click', event => {
+        event.stopPropagation();
+        root.remove();
         finish();
-        return;
-    }
-    pushPoint(subtractPoint(mouse, absoluteStart));
+    })
+
+    return points => setAttributes(path, {
+        points: relativePointsAsString(points, start)
+    });
 };
+
+const wavePattern = () => {
+    const bounds = point(pattern.width, pattern.height);
+    const c = multiplyPoint(0.5, bounds);
+    const q = multiplyPoint(0.5, c);
+    // 'M -1 11 Q 12.5 -5, 25 10 T 51 9'
+    return buildSvg('pattern', {
+        x: '0',
+        y: '0',
+        id: 'wave-pattern',
+        width: `${bounds.x}px`,
+        height: `${bounds.y}px`,
+        patternUnits: "userSpaceOnUse",
+    }, buildSvg('path', {d: `M 0 ${c.y} Q ${q.x} -${q.y}, ${c.x} ${c.y} T ${bounds.x} ${c.y}`, fill: 'none', stroke: 'white'}))
+};
+
+const waveMask = () => buildSvg('mask', {
+    id: 'wave-mask',
+    x: 0,
+    y: 0,
+    width: '100%',
+    height: '100%',
+}, buildSvg('rect', {x: 0, y: 0, width: '100%', height: '100%', fill: 'url(#wave-pattern)'}));
 
 const createPolygonMark = (root, polygon, pos) => createMark({
     label: '',
@@ -394,24 +480,30 @@ const createPolygonMark = (root, polygon, pos) => createMark({
     shape: SHAPES.POLYGON,
 });
 
+const relativeClick = (root, relativeTo, proc) => event => proc(subtractPoint(
+    globalToSvgPoint(root, mousePoint(event)),
+    relativeTo
+));
+
 const newPolygon = (root, event) => acquireStatus(root, {name: 'newPolygon'}, release => {
-    const absoluteStart = mousePoint(event);
-    const offset = rootRect(root);
-    const frame = createPolygonFrame(root.nodes.layers.foreground, subtractPoint(absoluteStart, offset));
+    const start = globalToSvgPoint(root, mousePoint(event));
+    const updatePath = createPolygonFrame(root.nodes.layers.foreground, start, () => finish());
     const polygon = [point(0, 0)];
+    const relative = proc => relativeClick(root, start, proc);
 
     const toBeReleased = [
         release,
-        frame.remove,
-        addEventLease(window, 'mousemove', polygonMouseMove(frame, absoluteStart, () => polygon)),
-        addEventLease(root.nodes.svg, 'click', ignoreFirstCall(
-            addPolygonPoint(absoluteStart, polygon.push.bind(polygon), () => finish())
+        addEventLease(window, 'mousemove', relative(
+            point => updatePath([...polygon, point])
         )),
+        addEventLease(root.nodes.svg, 'click', ignoreFirstCall(relative(
+            point => polygon.push(point)
+        ))),
     ];
 
     const finish = () => {
         toBeReleased.forEach(release => release());
-        const mark = createPolygonMark(root, polygon, subtractPoint(absoluteStart, offset));
+        const mark = createPolygonMark(root, polygon, start);
         addMark(root, mark);
         selectMark(root, mark.key);
     };
@@ -426,42 +518,52 @@ const addInteractions = root => {
 };
 
 const creationColor = root => root.creation.color();
+const creationSelectedColor = root => root.creation.selectedColor();
 const creationShape = root => root.creation.shape();
 
 const createThenEdit = edit => (root, event) => acquireStatus(root, {name: 'drawNew'}, release => {
-    const mark = createMarkAtPoint(subtractPoint(mousePoint(event), rootRect(root)), creationShape(root), creationColor(root));
-    addMark(root, mark);
+    const mark = createMarkAtPoint(globalToSvgPoint(root, mousePoint(event)), creationShape(root), creationColor(root), creationSelectedColor(root));
     release();
-    edit(root, root.groups[mark.key], event);
+    addMarkSilently(root, mark);
+    edit(root, root.groups[mark.key], event).then(() => {
+        root.emit.createMark(root.groups[mark.key].mark);
+        selectMark(root, mark.key);
+    });
 });
 
 const drawNew = {
     [SHAPES.RECTANGLE]: createThenEdit(editRectangle),
     [SHAPES.CIRCLE]: createThenEdit(editCircle),
     [SHAPES.POLYGON]: newPolygon,
+    [SHAPES.LINE]: createThenEdit(editLineLike),
+    [SHAPES.WAVE]: createThenEdit(editLineLike),
 };
 
 const drawNewGroup = (root, event) => drawNew[creationShape(root)](root, event);
 
-const forceSelect = (root, group) => {
+const forceSelectSilently = (root, group) => {
     moveChildren(root.nodes.layers.foreground, root.nodes.layers.normal);
     add(root.nodes.layers.foreground, group.nodes.root);
-    root.emit.selectMark(group.mark);
 };
 
 const selectGroup = (root, group) => acquireStatus(root, {name: 'selecting'}, release => {
-    forceSelect(root, group);
+    forceSelectSilently(root, group);
+    root.emit.selectMark(group.mark);
     release();
 });
 
 const selectMark = (root, key) => selectGroup(root, root.groups[key]);
 
-const addMark = (root, mark) => {
-    root.groups[mark.key] && error(`Duplicated key: ${mark.key}`);
+const addMarkSilently = (root, mark) => {
+    assert(!root.groups[mark.key], `Duplicated key: ${mark.key}`);
 
     const group = groupFromMark(mark);
     attachGroup(root, group);
     root.groups[mark.key] = group;
+};
+
+const addMark = (root, mark) => {
+    addMarkSilently(root, mark);
     root.emit.createMark(mark);
 };
 
@@ -478,7 +580,16 @@ const updateMark = (root, mark) => {
     }
 };
 
+const updateView = root => setAttributes(root.nodes.svg, {
+    ...pointAsSize(multiplyPoint(root.canvas.scale(), sizeAsPoint(root.canvas.size()))),
+    'viewBox': [0, 0, root.canvas.size().width, root.canvas.size().height].join(' '),
+});
+
 const rootRect = root => root.nodes.app.getBoundingClientRect();
+const globalToSvgPoint = (root, point) => multiplyPoint(
+    1 / root.canvas.scale(),
+    subtractPoint(point, root.nodes.svg.getBoundingClientRect())
+);
 
 /**
  * @typedef {{
@@ -488,7 +599,8 @@ const rootRect = root => root.nodes.app.getBoundingClientRect();
  *     selectMark: {function(string): void},
  *     updateMark: {function(Mark): void},
  *     setDefaultColor: {function(string): void},
- *     setDefaultShape : {function(string): void},
+ *     setDefaultShape: {function(string): void},
+ *     setZoomLevel: {function(number): void},
  * }} ImageMarker
  *
  * @param {HTMLElement} parent
@@ -504,23 +616,29 @@ export default (parent, onCreation, onSelection) => {
     );
     addInteractions(root);
 
+    const addMarkToCurrentRoot = mark => addMark(root, createMark(mark));
+    const removeMark = key => {
+        root.groups[key].nodes.root.remove();
+        remove(root.groups, key);
+    };
+
     return {
         showPage: (url, marks) => {
-            showImage(root.nodes.backgroundImage, rootRect(root), url);
+            showImage(root, rootRect(root), url);
             add(root.nodes.layers.background, root.nodes.backgroundImage);
-            marks.forEach(compose(curry(addMark, root), createMark));
+            root.canvas.scale(1);
+            Object.values(root.groups).forEach(group => removeMark(group.mark.key));
+            marks.forEach(addMarkToCurrentRoot);
         },
-        addMark: mark => addMark(root, createMark(mark)),
-        removeMark: key => {
-            root.groups[key].nodes.root.remove();
-            remove(root.groups, key);
-        },
+        addMark: addMarkToCurrentRoot,
+        removeMark,
         selectMark: key => selectMark(root, key),
         updateMark: mark => updateMark(root, createMark(mark)),
         setDefaultColor: color => root.creation.color(color),
-        setDefaultShape: shape => {
-            Object.values(SHAPES).includes(shape) || error(`Invalid shape name: ${shape}.`);
-            root.creation.shape(shape);
+        setDefaultShape: shape => root.creation.shape(shape),
+        setZoomLevel: level => {
+            root.canvas.scale(level);
+            updateView(root);
         },
     };
 };

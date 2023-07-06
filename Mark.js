@@ -4,6 +4,8 @@ export const SHAPES = {
     CIRCLE: 'circle',
     RECTANGLE: 'rectangle',
     POLYGON: 'polygon',
+    LINE: 'line',
+    WAVE: 'wave',
 };
 
 const isShapeName = x => Object.values(SHAPES).includes(x);
@@ -12,12 +14,15 @@ const expectedShapes = {
     [SHAPES.CIRCLE]: {},
     [SHAPES.RECTANGLE]: {width: isNumber, height: isNumber},
     [SHAPES.POLYGON]: {polygon: arrayOf(isPoint)},
+    [SHAPES.LINE]: {end: isPoint},
+    [SHAPES.WAVE]: {end: isPoint},
 };
 
 const expectedBase = {
     key: isString,
     label: isString,
     color: isString,
+    selectedColor: isString,
     shape: isShapeName,
     pos: isPoint,
 };
@@ -31,6 +36,8 @@ const selectShape = {
     [SHAPES.CIRCLE]: () => ({}),
     [SHAPES.RECTANGLE]: curry(only, ['width', 'height']),
     [SHAPES.POLYGON]: ({polygon}) => ({polygon: polygon.map(curry(only, ['x', 'y']))}),
+    [SHAPES.LINE]: ({end: {x, y}}) => ({end: {x, y}}),
+    [SHAPES.WAVE]: ({end: {x, y}}) => ({end: {x, y}}),
 };
 
 /**
@@ -40,6 +47,7 @@ const selectShape = {
  *     key: {string}
  *     label: {string}
  *     color: {string}
+ *     selectedColor: {string}
  *     shape,: {string}
  *     pos: {Point}
  * }} Mark
@@ -47,6 +55,8 @@ const selectShape = {
  * @typedef {Mark & {width: number, height: number}} Rectangle
  * @typedef {Mark} Circle
  * @typedef {Mark & {polygon: Point[]}} Polygon
+ * @typedef {Mark & {end: Point}} Line
+ * @typedef {Mark & {end: Point}} Wave
  *
  * @param {Object} object
  *

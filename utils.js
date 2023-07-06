@@ -1,6 +1,6 @@
-const Void = () => {};
+export const Void = () => {};
 
-const willFollowMouseDown = ({start = Void, move = Void, stop = Void}) => e => {
+export const willFollowMouseDown = ({start = Void, move = Void, stop = Void}) => e => {
     const onMove = e => move(e); // Don't use move directly, to keep the event listener private.
 
     const onUp = e => {
@@ -18,54 +18,55 @@ const willFollowMouseDown = ({start = Void, move = Void, stop = Void}) => e => {
 
 const distance = (a, b) => Math.abs(a - b);
 
-const rectFromPoints = (a, b) => ({
+export const rectFromPoints = (a, b) => ({
     x: Math.min(a.x, b.x),
     y: Math.min(a.y, b.y),
     width: distance(a.x, b.x),
     height: distance(a.y, b.y),
 });
 
-const identity = x => x;
-const isObject = x => typeof x === 'object';
-const isString = x => typeof x === 'string';
-const isNumber = x => typeof x === 'number';
-const isUndefined = x => typeof x === 'undefined';
-const mapObject = (proc, object) => Object.fromEntries(Object.entries(object).map(([k, v]) => [k, proc(v, k)]));
+export const identity = x => x;
+export const isObject = x => typeof x === 'object';
+export const isString = x => typeof x === 'string';
+export const isNumber = x => typeof x === 'number';
+export const isUndefined = x => typeof x === 'undefined';
+export const mapObject = (proc, object) => Object.fromEntries(Object.entries(object).map(([k, v]) => [k, proc(v, k)]));
 const filterObject = (keep, object) => Object.fromEntries(Object.entries(object).filter(([k, v]) => keep(v, k)));
-const without = (keys, object) => filterObject((_, key) => !keys.includes(key), object);
-const only = (keys, object) => filterObject((_, key) => keys.includes(key), object);
+export const without = (keys, object) => filterObject((_, key) => !keys.includes(key), object);
+export const only = (keys, object) => filterObject((_, key) => keys.includes(key), object);
 
-const matchesShape = (shape, value) => isObject(value) && 0 === Object.values(mapObject((proc, k) => proc(value[k]), shape)).filter(x => !x).length;
+export const matchesShape = (shape, value) => isObject(value) && 0 === Object.values(mapObject((proc, k) => proc(value[k]), shape)).filter(x => !x).length;
 
 const pipe = (...args) => x => args.reduce((x, f) => f(x), x);
-const compose = (...args) => pipe(...args.reverse());
+export const compose = (...args) => pipe(...args.reverse());
 
 const none = Symbol('none');
-const ifSome = proc => x => x === none ? none : proc(x);
-const ifNone = proc => x => x === none ? proc() : x;
+export const ifSome = proc => x => x === none ? none : proc(x);
+export const ifNone = proc => x => x === none ? proc() : x;
 
-const mismatch = (shape, value) => compose(
+export const mismatch = (shape, value) => compose(
     ...Object.entries(shape).map(([key, proc]) => ifNone(() => proc(value[key]) ? none : {key, type: proc.name, offendingValue: value[key]})),
 )(isObject(value) ? none : {type: isObject.name, offendingValue: value});
 
-const errorOnMismatch = (shape, value) => {
+export const errorOnMismatch = (shape, value) => {
     const showKey = key => key ? `Key "${key}" of ` : '';
     ifSome(({type, key = false}) => error(
         `Value does not match required form: ${showKey(key)}${JSON.stringify(value)} does not satisfy ${type}.`
     ))(mismatch(shape, value));
 };
 
-const point = (x, y) => ({x, y});
-const isPoint = p => matchesShape({x: isNumber, y: isNumber}, p);
-const mousePoint = event => ({x: event.clientX, y: event.clientY});
+export const point = (x, y) => ({x, y});
+export const isPoint = p => matchesShape({x: isNumber, y: isNumber}, p);
+export const mousePoint = event => ({x: event.clientX, y: event.clientY});
 
-const addPoint = (a, b) => ({x: a.x + b.x, y: a.y + b.y});
-const multiplyPoint = (scalar, a) => ({x: a.x * scalar, y: a.y * scalar});
-const subtractPoint = (a, b) => addPoint(a, multiplyPoint(-1, b));
-const pointAsSize = a => ({width: a.x, height: a.y});
-const sizeAsPoint = s => point(s.width, s.height);
+export const addPoint = (a, b) => ({x: a.x + b.x, y: a.y + b.y});
+export const multiplyPoint = (scalar, a) => ({x: a.x * scalar, y: a.y * scalar});
+export const subtractPoint = (a, b) => addPoint(a, multiplyPoint(-1, b));
+export const pointAsSize = a => ({width: a.x, height: a.y});
+export const sizeAsPoint = s => point(s.width, s.height);
+export const size = (width, height) => ({width, height});
 
-const fitInRect = (viewport, size) => {
+export const fitInRect = (viewport, size) => {
     const [first, second] = (viewport.width / viewport.height) < (size.width / size.height) ?
           ['height', 'width'] :
           ['width', 'height'];
@@ -75,16 +76,18 @@ const fitInRect = (viewport, size) => {
     };
 };
 
-const error = message => {
+export const error = message => {
     throw new Error(message);
 };
 
-const always = x => () => x;
-const any = (predicate, array) => !isUndefined(array.find(predicate));
-const all = (predicate, array) => !any(x => !predicate(x), array);
-const isArray = x => x instanceof Array;
+export const assert = (ok, message) => ok || error(message);
 
-const arrayOf = isType => {
+export const always = x => () => x;
+export const any = (predicate, array) => !isUndefined(array.find(predicate));
+export const all = (predicate, array) => !any(x => !predicate(x), array);
+export const isArray = x => x instanceof Array;
+
+export const arrayOf = isType => {
     const desiredFunctionName = arrayOf.name + '(' + isType.name + ')';
     const trickJsToSetFunctioName = {
         [desiredFunctionName]: x => isArray(x) && all(isType, x),
@@ -92,39 +95,40 @@ const arrayOf = isType => {
     return trickJsToSetFunctioName[desiredFunctionName];
 };
 
-const diff = (left, right) => Object.entries(left).reduce((prev, [k, v]) => v === right[k] ? prev : [...prev, {left: v, right: right[k], name: k}], []);
+export const diff = (left, right) => Object.entries(left).reduce((prev, [k, v]) => v === right[k] ? prev : [...prev, {left: v, right: right[k], name: k}], []);
 
-const set = Reflect.set;
-const remove = Reflect.deleteProperty;
-const curry = (proc, ...args) => proc.bind(null, ...args);
-const apply = proc => proc.apply.bind(proc, null);
-const functionArgsFromObject = (proc, object) => Object.entries(object).forEach(apply(proc));
-const methodArgsFromObject = (x, method, object) => functionArgsFromObject(x[method].bind(x), object);
-const tap = proc => x => {
+export const set = Reflect.set;
+export const remove = Reflect.deleteProperty;
+export const curry = (proc, ...args) => proc.bind(null, ...args);
+export const apply = proc => proc.apply.bind(proc, null);
+export const functionArgsFromObject = (proc, object) => Object.entries(object).forEach(apply(proc));
+export const methodArgsFromObject = (x, method, object) => functionArgsFromObject(x[method].bind(x), object);
+export const tap = proc => x => {
     proc(x);
     return x;
 };
 
-const between = (left, x, right) => left <= x && x <= right;
+export const between = (left, x, right) => left <= x && x <= right;
 
-const pointInRect = (p, rect) => between(rect.x, p.x, rect.x + rect.width) && between(rect.y, p.y, rect.y + rect.height);
+export const pointInRect = (p, rect) => between(rect.x, p.x, rect.x + rect.width) && between(rect.y, p.y, rect.y + rect.height);
 
-const pointAsString = ({x, y}) => `${x},${y}`;
-const relativePoints = (polygon, point) => polygon.map(p => addPoint(p, point));
-const pointsAsString = points => points.map(pointAsString).join(' ');
+export const pointAsString = ({x, y}) => `${x},${y}`;
+export const relativePoints = (polygon, point) => polygon.map(p => addPoint(p, point));
+export const pointsAsString = points => points.map(pointAsString).join(' ');
 
-const relativePointsAsString = (points, point) => pointsAsString(relativePoints(points, point));
+export const relativePointsAsString = (points, point) => pointsAsString(relativePoints(points, point));
 
-const ignoreFirstCall = proc => {
+export const ignoreFirstCall = proc => {
     let wrapper = () => {wrapper = proc;};
     return (...args) => wrapper(...args);
 };
 
-const ref = value => (newValue = undefined) => {
+export const ref = value => (newValue = undefined, guard = Void) => {
     if (isUndefined(newValue)) {
         return value;
     }
+    guard(newValue);
     value = newValue;
 };
 
-export {willFollowMouseDown, mousePoint, rectFromPoints, addPoint, multiplyPoint, subtractPoint, pointAsSize, sizeAsPoint, point, without, isUndefined, isString, matchesShape, arrayOf, isNumber, error, mismatch, compose, ifSome, ifNone, errorOnMismatch, fitInRect, diff, apply, functionArgsFromObject, methodArgsFromObject, tap, only, Void, isObject, set, remove, curry, identity, any, all, always, isArray, between, pointInRect, isPoint, relativePoints, pointsAsString, ignoreFirstCall, ref, relativePointsAsString, mapObject};
+export const rotatePoint = (a, r) => point(a.x * Math.cos(r) - a.y*Math.sin(r), a.x*Math.sin(r) + a.y*Math.cos(r));
