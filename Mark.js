@@ -1,4 +1,4 @@
-import { matchesShape, isNumber, arrayOf, error, isString, mismatch, ifSome, errorOnMismatch, isPoint, only, curry } from './utils';
+import { isNumber, arrayOf, isString, errorOnMismatch, isPoint, only } from './utils';
 
 export const SHAPES = {
     CIRCLE: 'circle',
@@ -34,8 +34,8 @@ const selectBase = object => ({
 
 const selectShape = {
     [SHAPES.CIRCLE]: () => ({}),
-    [SHAPES.RECTANGLE]: curry(only, ['width', 'height']),
-    [SHAPES.POLYGON]: ({polygon}) => ({polygon: polygon.map(curry(only, ['x', 'y']))}),
+    [SHAPES.RECTANGLE]: x => only(['width', 'height'], x),
+    [SHAPES.POLYGON]: ({polygon}) => ({polygon: polygon.map(x => only(['x', 'y'], x))}),
     [SHAPES.LINE]: ({end: {x, y}}) => ({end: {x, y}}),
     [SHAPES.WAVE]: ({end: {x, y}}) => ({end: {x, y}}),
 };
