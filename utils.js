@@ -293,13 +293,15 @@ export const loadImage = url => new Promise((resolve, reject) => {
 
 const eventIsTouchEnd = event => event.type === 'touchend' && event.touches.length === 0;
 
-const eventIsPrimary = createGeneric(event => event.constructor.name);
+const eventIsPrimary = createGeneric((event, name = undefined) => isUndefined(name) ? event.constructor.name : name);
 define(eventIsPrimary, 'TouchEvent', event => event.touches.length === 1 || eventIsTouchEnd(event));
 define(eventIsPrimary, 'MouseEvent', event => event.button === 0);
+define(eventIsPrimary, 'PointerEvent', event => eventIsPrimary(event, 'MouseEvent'));
 
 const eventIsSecondary = createGeneric(event => event.constructor.name);
 define(eventIsSecondary, 'TouchEvent', event => event.touches.length === 2 || eventIsTouchEnd(event));
 define(eventIsSecondary, 'MouseEvent', event => event.button === 1);
+define(eventIsSecondary, 'PointerEvent', event => eventIsSecondary(event, 'MouseEvent'));
 
 export const addEvent = createGeneric((_, event) => event);
 
