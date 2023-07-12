@@ -14,6 +14,7 @@ export const isObject = x => typeof x === 'object';
 export const isString = x => typeof x === 'string';
 export const isNumber = x => typeof x === 'number';
 export const isUndefined = x => typeof x === 'undefined';
+export const isNull = x => x === null;
 export const mapObject = (proc, object) => Object.fromEntries(Object.entries(object).map(([k, v]) => [k, proc(v, k)]));
 const filterObject = (keep, object) => Object.fromEntries(Object.entries(object).filter(([k, v]) => keep(v, k)));
 export const without = (keys, object) => filterObject((_, key) => !keys.includes(key), object);
@@ -27,6 +28,8 @@ export const compose = (...args) => pipe(...args.reverse());
 const none = Symbol('none');
 export const ifSome = proc => x => x === none ? none : proc(x);
 export const ifNone = proc => x => x === none ? proc() : x;
+
+export const unless = (predicate, proc) => x => predicate(x) ? x : proc(x);
 
 export const mismatch = (shape, value) => compose(
     ...Object.entries(shape).map(([key, proc]) => ifNone(() => proc(value[key]) ? none : {key, type: proc.name, offendingValue: value[key]})),

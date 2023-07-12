@@ -1,5 +1,5 @@
 import createMark, { SHAPES } from './Mark';
-import { compose, fitInRect, mousePoint, subtractPoint, addPoint, set, remove, tap, error, point, rectFromPoints, relativePointsAsString, ref, pointAsSize, sizeAsPoint, multiplyPoint, isNumber, size, assert, rotatePoint, define, createGeneric, callAll, onChange, setStyleAttribute, neverChange, setAttribute, buildSvg, buildNode, add, createStatus, addEvent, onlyWhen, loadImage, setAttributes, applyDef, updateDef, setText, onChangeValues, moveChildren, willFollowMouseDown, mouseFlow, pathDiff, memberInChanges } from './utils';
+import { compose, fitInRect, mousePoint, subtractPoint, addPoint, set, remove, tap, error, point, rectFromPoints, relativePointsAsString, ref, pointAsSize, sizeAsPoint, multiplyPoint, isNumber, size, assert, rotatePoint, define, createGeneric, callAll, onChange, setStyleAttribute, neverChange, setAttribute, buildSvg, buildNode, add, createStatus, addEvent, onlyWhen, loadImage, setAttributes, applyDef, updateDef, setText, onChangeValues, moveChildren, willFollowMouseDown, mouseFlow, pathDiff, memberInChanges, isNull, unless } from './utils';
 
 const pattern = size(5, 4);
 
@@ -227,6 +227,7 @@ const attachShape = (root, group) => {
 
 const createThenEdit = edit => (root, event) => acquireStatus(root, {name: 'drawNew'}, release => {
     const mark = createMarkAtPoint(globalToSvgPoint(root, mousePoint(event)), creationShape(root), creationColor(root), creationSelectedColor(root));
+    root.emit.selectMark(null);
     release();
     addMarkSilently(root, mark);
     edit(root, root.groups[mark.key], event).then(() => {
@@ -372,6 +373,7 @@ const relativeClick = (root, relativeTo, proc) => event => {
 
 define(mouseDown, ['draw-shape', SHAPES.POLYGON], (root, event) => acquireStatus(root, {name: 'newPolygon'}, release => {
     event.preventDefault();
+    root.emit.selectMark(null);
     const start = globalToSvgPoint(root, mousePoint(event));
     const updatePath = createPolygonFrame(root.nodes.layers.foreground, start, () => finish());
     const polygon = [point(0, 0)];
@@ -497,14 +499,14 @@ const globalToSvgPoint = (root, point) => multiplyPoint(
  *
  * @param {HTMLElement} parent
  * @param {function(Mark): any} onCreation
- * @param {function(Mark): any} onSelection
+ * @param {function(?Mark): any} onSelection
  * @return ImageMarker
  */
 export default (parent, onCreation, onSelection) => {
     const root = createRoot(
         parent,
         compose(onCreation, createMark),
-        compose(onSelection, createMark)
+        compose(onSelection, unless(isNull, createMark))
     );
     addInteractions(root);
 
