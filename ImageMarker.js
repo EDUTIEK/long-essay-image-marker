@@ -442,7 +442,7 @@ const selectGroup = (root, group) => acquireStatus(root, {name: 'selecting'}, re
     release();
 });
 
-const selectMark = (root, key) => selectGroup(root, root.groups[key]);
+const selectMark = (root, key) => selectGroup(root, root.groups[key] || error(`Mark with key ${key} does not exist.`));
 
 const addMarkSilently = (root, mark) => {
     assert(!root.groups[mark.key], `Duplicated key: ${mark.key}`);
@@ -458,7 +458,7 @@ const addMark = (root, mark) => {
 };
 
 const updateMark = (root, mark) => {
-    assert(root.groups[mark.key], `Mark with key ${mark.key} does not exist.`)
+    assert(root.groups[mark.key], `Mark with key ${mark.key} does not exist.`);
     const group = root.groups[mark.key];
     const changes = pathDiff(group.mark, mark);
     group.mark = mark;
