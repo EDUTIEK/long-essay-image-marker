@@ -71,10 +71,22 @@ define(definitionFor, SHAPES.WAVE, () => [
     neverChange('shape wave', setAttribute('class'))
 ]);
 
+const child = (nr, proc) => v => node => proc(v)(node.children[nr]);
+
 define(definitionFor, 'label', () => [
-    onChange(['pos', 'x'], setAttribute('x')),
-    onChange(['pos', 'y'], setAttribute('y')),
-    onChange(['label'], setText()),
+    onChange(['pos', 'x'], child(0, setAttribute('x'))),
+    onChange(['pos', 'x'], child(1, setAttribute('x'))),
+    onChange(['pos', 'y'], child(1, setAttribute('y'))),
+    neverChange('label', child(0, setAttribute('class'))),
+    neverChange('label', child(1, setAttribute('class'))),
+    onChangeValues({label: ['label'], y: ['pos', 'y']}, ({label, y}) => node => {
+        setText()(label)(node.children[1]);
+        requestAnimationFrame(() => {
+            const {width, height} = node.children[1].getBBox();
+            setAttributes(node.children[0], {y: y - height + (height * 0.19), width, height});
+
+        })
+    }),
 ]);
 
 const createShape = val => {
@@ -84,7 +96,7 @@ const createShape = val => {
 };
 
 const createLabel = val => {
-    const node = buildSvg('text');
+    const node = buildSvg('g', {}, buildSvg('rect'), buildSvg('text'));
     applyDef(val, definitionFor('label'), node);
     return node;
 };
@@ -151,6 +163,7 @@ const createStyle = () => tap(style => set(
     'svg * {user-select: none;} ' +
     'svg .shape {fill: var(--default-color);}' +
     'svg .shape.wave {mask: url(#wave-mask);}' +
+    'svg rect.label {fill: lightblue;}' +
     'svg .foreground .shape {fill: var(--selected-color);}'
 ))(document.createElement('style'));
 
