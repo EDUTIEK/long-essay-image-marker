@@ -1,4 +1,4 @@
-import { isNumber, arrayOf, isString, errorOnMismatch, isPoint, only } from './utils';
+import { isNumber, arrayOf, isString, errorOnMismatch, isPoint, only, createGeneric, define, identity } from './utils';
 
 export const SHAPES = {
     CIRCLE: 'circle',
@@ -11,7 +11,7 @@ export const SHAPES = {
 const isShapeName = x => Object.values(SHAPES).includes(x);
 
 const expectedShapes = {
-    [SHAPES.CIRCLE]: {},
+    [SHAPES.CIRCLE]: {symbol: isString, symbolColor: isString},
     [SHAPES.RECTANGLE]: {width: isNumber, height: isNumber},
     [SHAPES.POLYGON]: {polygon: arrayOf(isPoint)},
     [SHAPES.LINE]: {end: isPoint},
@@ -33,12 +33,17 @@ const selectBase = object => ({
 });
 
 const selectShape = {
-    [SHAPES.CIRCLE]: () => ({}),
+    [SHAPES.CIRCLE]: x => only(['symbol', 'symbolColor'], x),
     [SHAPES.RECTANGLE]: x => only(['width', 'height'], x),
     [SHAPES.POLYGON]: ({polygon}) => ({polygon: polygon.map(x => only(['x', 'y'], x))}),
     [SHAPES.LINE]: ({end: {x, y}}) => ({end: {x, y}}),
     [SHAPES.WAVE]: ({end: {x, y}}) => ({end: {x, y}}),
 };
+
+const applyDefaults = createGeneric(x => x.shape);
+
+define(applyDefaults, identity);
+define(applyDefaults, SHAPES.CIRCLE, ({symbol = '', symbolColor = 'black', ...x}) => ({...x, symbol, symbolColor}));
 
 /**
  * @typedef {{x: number, y: number}} Point
@@ -53,7 +58,7 @@ const selectShape = {
  * }} Mark
  *
  * @typedef {Mark & {width: number, height: number}} Rectangle
- * @typedef {Mark} Circle
+ * @typedef {Mark & {symbol: string}} Circle
  * @typedef {Mark & {polygon: Point[]}} Polygon
  * @typedef {Mark & {end: Point}} Line
  * @typedef {Mark & {end: Point}} Wave
@@ -70,12 +75,15 @@ const selectShape = {
  * @param {string} object.shape,
  * Position of the mark in pixels on the full-width page image.
  * @param {Point} object.pos
+ * @param {string} [object.symbol]
+ * @param {string} [object.symbolColor]
+ *
  * @return {Mark}
  */
 export default object => {
-    const { key = 'mark-' + Math.random().toString() } = object;
-    object.key = key;
+    object = {...object, key: object.key || 'mark-' + Math.random().toString()};
     errorOnMismatch(expectedBase, object);
+    object = applyDefaults(object);
     errorOnMismatch(expectedShapes[object.shape], object);
 
     return {

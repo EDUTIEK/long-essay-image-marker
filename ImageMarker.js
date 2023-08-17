@@ -1,5 +1,5 @@
 import createMark, { SHAPES } from './Mark';
-import { compose, fitInRect, mousePoint, subtractPoint, addPoint, set, remove, tap, error, point, rectFromPoints, relativePointsAsString, ref, pointAsSize, sizeAsPoint, multiplyPoint, isNumber, size, assert, rotatePoint, define, createGeneric, callAll, onChange, setStyleAttribute, neverChange, setAttribute, buildSvg, buildNode, add, createStatus, addEvent, onlyWhen, loadImage, setAttributes, applyDef, updateDef, setText, onChangeValues, moveChildren, willFollowMouseDown, mouseFlow, pathDiff, memberInChanges, isNull, unless } from './utils';
+import { compose, fitInRect, mousePoint, subtractPoint, addPoint, set, remove, tap, error, point, rectFromPoints, relativePointsAsString, ref, pointAsSize, sizeAsPoint, multiplyPoint, isNumber, size, assert, rotatePoint, define, createGeneric, callAll, onChange, setStyleAttribute, neverChange, setAttribute, buildSvg, buildNode, add, createStatus, addEvent, onlyWhen, loadImage, setAttributes, applyDef, updateDef, setText, onChangeValues, moveChildren, willFollowMouseDown, mouseFlow, pathDiff, memberInChanges, isNull, unless, identity } from './utils';
 
 const pattern = size(5, 4);
 
@@ -51,9 +51,14 @@ define(definitionFor, SHAPES.RECTANGLE, () => [
 
 define(definitionFor, SHAPES.CIRCLE, () => [
     ...definitionForAllShapes,
-    onChange(['pos', 'x'], setAttribute('cx')),
-    onChange(['pos', 'y'], setAttribute('cy')),
-    neverChange(10, setAttribute('r'))
+    onChange(['pos', 'x'], child(0, setAttribute('cx'))),
+    onChange(['pos', 'y'], child(0, setAttribute('cy'))),
+    onChange(['pos', 'x'], child(1, setAttribute('x'))),
+    onChange(['pos', 'y'], child(1, setAttribute('y'))),
+    onChange(['symbol'], child(1, setText())),
+    onChange(['symbolColor'], child(1, setStyleAttribute('fill'))),
+    neverChange('symbol', child(1, setAttribute('class'))),
+    neverChange(10, child(0, setAttribute('r'))),
 ]);
 
 define(definitionFor, SHAPES.POLYGON, () => [
@@ -89,8 +94,19 @@ define(definitionFor, 'label', () => [
     }),
 ]);
 
+const buildShape = createGeneric(identity);
+
+// define(buildShape, buildSvg(nodeNameOfShape(val.shape)))
+
+define(buildShape, SHAPES.RECTANGLE, () => buildSvg('rect'));
+define(buildShape, SHAPES.CIRCLE, () => buildSvg('g', {}, buildSvg('circle'), buildSvg('text')));
+define(buildShape, SHAPES.POLYGON, () => buildSvg('polygon'));
+define(buildShape, SHAPES.LINE, () => buildSvg('rect'));
+define(buildShape, SHAPES.WAVE, () => buildSvg('rect'));
+define(buildShape, name => error(`Invalid shape name: ${name}.`))
+
 const createShape = val => {
-    const node = buildSvg(nodeNameOfShape(val.shape));
+    const node = buildShape(val.shape);
     applyDef(val, definitionFor(val), node);
     return node;
 };
@@ -105,14 +121,6 @@ const updateExisting = (val, changes, group) => {
     updateDef(val, definitionFor(val), changes, group.nodes.shape);
     updateDef(val, definitionFor('label'), changes, group.nodes.label);
 };
-
-const nodeNameOfShape = name => ({
-    [SHAPES.RECTANGLE]: 'rect',
-    [SHAPES.CIRCLE]: 'circle',
-    [SHAPES.POLYGON]: 'polygon',
-    [SHAPES.LINE]: 'rect',
-    [SHAPES.WAVE]: 'rect',
-})[name] || error(`Invalid shape name: ${name}.`);
 
 const groupFromMark = mark => ({
     mark,
@@ -156,15 +164,18 @@ const showImage = (root, url) => loadImage(url).then(imageSize => {
 const createStyle = () => tap(style => set(
     style,
     'innerHTML',
-    '.hej {position: relative; width: 100%; height: 100%; overflow: auto;} ' +
-    '.hej.moving {overflow: hidden;} ' +
-    'svg .polygon-start:hover {stroke: blue;} ' +
-    'svg {position: absolute;}' +
-    'svg * {user-select: none;} ' +
-    'svg .shape {fill: var(--default-color);}' +
-    'svg .shape.wave {mask: url(#wave-mask);}' +
-    'svg rect.label {fill: lightblue;}' +
-    'svg .foreground .shape {fill: var(--selected-color);}'
+    [
+        ' {position: relative; width: 100%; height: 100%; overflow: auto;}',
+        '.moving {overflow: hidden;}',
+        ' svg .polygon-start:hover {stroke: blue;}',
+        ' svg {position: absolute;}',
+        ' svg * {user-select: none;}',
+        ' svg .shape {fill: var(--default-color);}',
+        ' svg .shape.wave {mask: url(#wave-mask);}',
+        ' svg rect.label {fill: lightblue;}',
+        ' svg .foreground .shape {fill: var(--selected-color);}',
+        ' svg .shape text.symbol {text-anchor: middle; dominant-baseline: central; fill: black;}',
+    ].map(s => '.long-essay-image-marker' + s).join(' ')
 ))(document.createElement('style'));
 
 const createLayers = () => ({
@@ -186,7 +197,7 @@ const assertValidScale = scale => {
 const createRoot = (parent, createMark, selectMark) => {
     const layers = createLayers();
     const svg = buildSvg('svg', {width: '100%', height: '100%'}, ...Object.values(layers));
-    const app = buildNode('div', {'class': 'hej'}, svg);
+    const app = buildNode('div', {'class': 'long-essay-image-marker'}, svg);
     const backgroundImage = buildSvg('image');
     add(parent, app);
     add(parent, createStyle());
@@ -202,7 +213,7 @@ const createRoot = (parent, createMark, selectMark) => {
         creation: {
             color: ref('#0000AAAA'),
             selectedColor: ref('#FF0000AA'),
-            shape: ref(SHAPES.POLYGON, assertShapeName),
+            shape: ref(SHAPES.CIRCLE, assertShapeName),
         },
         status: createStatus({name: 'idle'}),
         canvas: {
