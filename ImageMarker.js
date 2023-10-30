@@ -90,7 +90,7 @@ define(definitionFor, 'label', () => [
             const {width, height} = node.children[1].getBBox();
             setAttributes(node.children[0], {y: y - height + (height * 0.19), width, height});
 
-        })
+        });
     }),
 ]);
 
@@ -103,7 +103,7 @@ define(buildShape, SHAPES.CIRCLE, () => buildSvg('g', {}, buildSvg('circle'), bu
 define(buildShape, SHAPES.POLYGON, () => buildSvg('polygon'));
 define(buildShape, SHAPES.LINE, () => buildSvg('rect'));
 define(buildShape, SHAPES.WAVE, () => buildSvg('rect'));
-define(buildShape, name => error(`Invalid shape name: ${name}.`))
+define(buildShape, name => error(`Invalid shape name: ${name}.`));
 
 const createShape = val => {
     const node = buildShape(val.shape);
@@ -230,7 +230,7 @@ const acquireStatus = (root, newStatus, then) => root.status.acquire(newStatus, 
 const acquireGroupStatus = (root, name, group, proc) => acquireStatus(root, {name, group}, proc);
 
 const addGroupInteractionsFor = (root, group, node) => {
-    addEvent(node, 'click', () => selectGroup(root, group));
+    addEvent(node, 'mousedown', e => moveGroup(root, group, e).then(() => selectGroup(root, group)));
 };
 
 const attachGroup = (root, group) => {
@@ -303,9 +303,10 @@ const editRectangle = (root, group, event) => acquireGroupStatus(root, 'editGrou
     },
     stop: release,
 }));
+
 define(mouseDown, ['draw-shape', SHAPES.RECTANGLE], createThenEdit(editRectangle));
 
-const editCircle = (root, group, event) => acquireGroupStatus(root, 'editGroup', group, release => untilMouseUp(root, event, {
+const moveGroup = (root, group, event) => acquireGroupStatus(root, 'moveGroup', group, release => untilMouseUp(root, event, {
     start: mouse => {
         mouse = globalToSvgPoint(root, mouse);
         forceSelectSilently(root, group);
@@ -322,7 +323,8 @@ const editCircle = (root, group, event) => acquireGroupStatus(root, 'editGroup',
     },
     stop: release,
 }));
-define(mouseDown, ['draw-shape', SHAPES.CIRCLE], createThenEdit(editCircle));
+
+define(mouseDown, ['draw-shape', SHAPES.CIRCLE], createThenEdit(moveGroup));
 
 const createPolygonFrame = (parent, start, finish) => {
     const finishDot = buildSvg('circle', {
@@ -447,7 +449,7 @@ const moveView = (root, event, button = 'primary') => acquireStatus(root, {name:
             return mouse;
         },
         stop: () => {
-            root.nodes.app.classList.remove('moving')
+            root.nodes.app.classList.remove('moving');
             release();
         },
     }, button);
@@ -456,7 +458,10 @@ const moveView = (root, event, button = 'primary') => acquireStatus(root, {name:
 define(mouseDown, 'scroll', moveView);
 
 const forceSelectSilently = (root, group) => {
+    const foreground = [].slice.call(root.nodes.layers.foreground.children)
+          .forEach(node => node.classList.remove('active'));
     moveChildren(root.nodes.layers.foreground, root.nodes.layers.normal);
+    group.nodes.root.classList.add('active');
     add(root.nodes.layers.foreground, group.nodes.root);
 };
 
