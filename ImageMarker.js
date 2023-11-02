@@ -1,7 +1,7 @@
 import createMark, { SHAPES } from './Mark';
 import { compose, fitInRect, mousePoint, subtractPoint, addPoint, set, remove, tap, error, point, rectFromPoints, relativePointsAsString, ref, pointAsSize, sizeAsPoint, multiplyPoint, isNumber, size, assert, rotatePoint, define, createGeneric, callAll, onChange, setStyleAttribute, neverChange, setAttribute, buildSvg, buildNode, add, createStatus, addEvent, onlyWhen, loadImage, setAttributes, applyDef, updateDef, setText, onChangeValues, moveChildren, willFollowMouseDown, mouseFlow, pathDiff, memberInChanges, isNull, unless, identity } from './utils';
 
-const pattern = size(5, 4);
+const pattern = size(10, 10);
 
 const pointStringFromMark = ({polygon, pos}) => relativePointsAsString(polygon, pos);
 const setPolygonPoints = polygonMark => node => node.setAttribute(
@@ -58,7 +58,7 @@ define(definitionFor, SHAPES.CIRCLE, () => [
     onChange(['symbol'], child(1, setText())),
     onChange(['symbolColor'], child(1, setStyleAttribute('fill'))),
     neverChange('symbol', child(1, setAttribute('class'))),
-    neverChange(10, child(0, setAttribute('r'))),
+    neverChange(20, child(0, setAttribute('r'))),
 ]);
 
 define(definitionFor, SHAPES.POLYGON, () => [
@@ -69,7 +69,7 @@ define(definitionFor, SHAPES.POLYGON, () => [
     }, setPolygonPoints),
 ]);
 
-define(definitionFor, SHAPES.LINE, () => createLineLikeShape(1));
+define(definitionFor, SHAPES.LINE, () => createLineLikeShape(2));
 
 define(definitionFor, SHAPES.WAVE, () => [
     ...createLineLikeShape(pattern.height),
@@ -81,10 +81,14 @@ const child = (nr, proc) => v => node => proc(v)(node.children[nr]);
 define(definitionFor, 'label', () => [
     onChange(['pos', 'x'], child(0, setAttribute('x'))),
     onChange(['pos', 'x'], child(1, setAttribute('x'))),
-    onChange(['pos', 'y'], child(1, setAttribute('y'))),
+    //onChange(['pos', 'y'], child(1, setAttribute('y'))),
     neverChange('label', child(0, setAttribute('class'))),
     neverChange('label', child(1, setAttribute('class'))),
-    onChangeValues({label: ['label'], y: ['pos', 'y']}, ({label, y}) => node => {
+    onChangeValues({shape: ['shape'], label: ['label'], y: ['pos', 'y']}, ({shape, label, y}) => node => {
+        if (shape == SHAPES.CIRCLE) {
+            y = y - 20;
+        }
+        setAttributes(node.children[1], {y});
         setText()(label)(node.children[1]);
         requestAnimationFrame(() => {
             const {width, height} = node.children[1].getBBox();
@@ -369,7 +373,7 @@ const wavePattern = () => {
         width: `${bounds.x}px`,
         height: `${bounds.y}px`,
         patternUnits: "userSpaceOnUse",
-    }, buildSvg('path', {d: `M 0 ${c.y} Q ${q.x} -${q.y}, ${c.x} ${c.y} T ${bounds.x} ${c.y}`, fill: 'none', stroke: 'white'}));
+    }, buildSvg('path', {d: `M 0 ${c.y} Q ${q.x} -${q.y}, ${c.x} ${c.y} T ${bounds.x} ${c.y}`, fill: 'white', stroke: 'white'}));
 };
 
 const waveMask = () => buildSvg('mask', {
