@@ -1,7 +1,7 @@
 import createMark, { SHAPES } from './Mark';
 import { compose, fitInRect, mousePoint, subtractPoint, addPoint, set, remove, tap, error, point, rectFromPoints, relativePointsAsString, ref, pointAsSize, sizeAsPoint, multiplyPoint, isNumber, size, assert, rotatePoint, define, createGeneric, callAll, onChange, setStyleAttribute, neverChange, setAttribute, buildSvg, buildNode, add, createStatus, addEvent, onlyWhen, loadImage, setAttributes, applyDef, updateDef, setText, onChangeValues, moveChildren, willFollowMouseDown, mouseFlow, pathDiff, memberInChanges, isNull, unless, identity } from './utils';
 
-const pattern = size(10, 10);
+const pattern = size(50, 50);
 
 const pointStringFromMark = ({polygon, pos}) => relativePointsAsString(polygon, pos);
 const setPolygonPoints = polygonMark => node => node.setAttribute(
@@ -58,7 +58,7 @@ define(definitionFor, SHAPES.CIRCLE, () => [
     onChange(['symbol'], child(1, setText())),
     onChange(['symbolColor'], child(1, setStyleAttribute('fill'))),
     neverChange('symbol', child(1, setAttribute('class'))),
-    neverChange(20, child(0, setAttribute('r'))),
+    neverChange(100, child(0, setAttribute('r'))),
 ]);
 
 define(definitionFor, SHAPES.POLYGON, () => [
@@ -69,7 +69,7 @@ define(definitionFor, SHAPES.POLYGON, () => [
     }, setPolygonPoints),
 ]);
 
-define(definitionFor, SHAPES.LINE, () => createLineLikeShape(2));
+define(definitionFor, SHAPES.LINE, () => createLineLikeShape(15));
 
 define(definitionFor, SHAPES.WAVE, () => [
     ...createLineLikeShape(pattern.height),
@@ -86,13 +86,13 @@ define(definitionFor, 'label', () => [
     neverChange('label', child(1, setAttribute('class'))),
     onChangeValues({shape: ['shape'], label: ['label'], y: ['pos', 'y']}, ({shape, label, y}) => node => {
         if (shape == SHAPES.CIRCLE) {
-            y = y - 20;
+            y = y - 100;
         }
         setAttributes(node.children[1], {y});
         setText()(label)(node.children[1]);
         requestAnimationFrame(() => {
             const {width, height} = node.children[1].getBBox();
-            setAttributes(node.children[0], {y: y - height + (height * 0.19), width, height});
+            setAttributes(node.children[0], {y: y - height + (height * 0.15), width, height});
 
         });
     }),
@@ -136,7 +136,7 @@ const groupFromMark = mark => ({
 });
 
 const defaultMarkValues = {
-    [SHAPES.RECTANGLE]: {width: 5, height: 5},
+    [SHAPES.RECTANGLE]: {width: 10, height: 20},
     [SHAPES.CIRCLE]: {},
     [SHAPES.POLYGON]: {polygon: [point(0, 0)]},
     [SHAPES.LINE]: {end: point(0, 0)},
