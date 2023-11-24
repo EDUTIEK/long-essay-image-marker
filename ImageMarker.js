@@ -2,14 +2,14 @@ import createMark, { SHAPES } from './Mark';
 import { compose, fitInRect, mousePoint, subtractPoint, addPoint, set, remove, tap, error, point, rectFromPoints, relativePointsAsString, ref, pointAsSize, sizeAsPoint, multiplyPoint, isNumber, size, assert, rotatePoint, define, createGeneric, callAll, onChange, setStyleAttribute, neverChange, setAttribute, buildSvg, buildNode, add, createStatus, addEvent, onlyWhen, loadImage, setAttributes, applyDef, updateDef, setText, onChangeValues, moveChildren, willFollowMouseDown, mouseFlow, pathDiff, memberInChanges, isNull, unless, identity } from './utils';
 
 const WAVE_PATTERN = {
-    lambda: 50,
-    amplitude: 25,
-    lineWidth: 4,
+    lambda: 60,
+    amplitude: 20,
+    lineWidth: 10,
 };
 
 const POLYGON_FRAME = {
-    startDot: {radius: 18, borderWidth: 6},
-    lineWidth: 5,
+    startDot: {radius: 20, borderWidth: 10},
+    lineWidth: 10,
 };
 
 const LINE = {
@@ -82,11 +82,12 @@ define(definitionFor, SHAPES.POLYGON, () => [
     }, setPolygonPoints),
 ]);
 
-define(definitionFor, SHAPES.LINE, () => createLineLikeShape(LINE.WIDTH));
+define(definitionFor, SHAPES.LINE, () => createLineLikeShape(LINE.width));
 
 define(definitionFor, SHAPES.WAVE, () => [
     ...createLineLikeShape(WAVE_PATTERN.amplitude * 2),
-    neverChange('shape wave', setAttribute('class'))
+    neverChange('shape wave', setAttribute('class')),
+    onChange(['locked'], l => setAttribute('class')('shape wave' + (l ? ' locked' : ''))), 
 ]);
 
 const child = (nr, proc) => v => node => proc(v)(node.children[nr]);
