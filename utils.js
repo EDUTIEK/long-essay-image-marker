@@ -15,6 +15,7 @@ export const isString = x => typeof x === 'string';
 export const isNumber = x => typeof x === 'number';
 export const isUndefined = x => typeof x === 'undefined';
 export const isNull = x => x === null;
+export const isBoolean = x => [true, false].includes(x);
 export const mapObject = (proc, object) => Object.fromEntries(Object.entries(object).map(([k, v]) => [k, proc(v, k)]));
 const filterObject = (keep, object) => Object.fromEntries(Object.entries(object).filter(([k, v]) => keep(v, k)));
 export const without = (keys, object) => filterObject((_, key) => !keys.includes(key), object);

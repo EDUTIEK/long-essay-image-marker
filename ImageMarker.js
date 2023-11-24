@@ -1,7 +1,20 @@
 import createMark, { SHAPES } from './Mark';
 import { compose, fitInRect, mousePoint, subtractPoint, addPoint, set, remove, tap, error, point, rectFromPoints, relativePointsAsString, ref, pointAsSize, sizeAsPoint, multiplyPoint, isNumber, size, assert, rotatePoint, define, createGeneric, callAll, onChange, setStyleAttribute, neverChange, setAttribute, buildSvg, buildNode, add, createStatus, addEvent, onlyWhen, loadImage, setAttributes, applyDef, updateDef, setText, onChangeValues, moveChildren, willFollowMouseDown, mouseFlow, pathDiff, memberInChanges, isNull, unless, identity } from './utils';
 
-const pattern = size(50, 50);
+const WAVE_PATTERN = {
+    lambda: 50,
+    amplitude: 25,
+    lineWidth: 4,
+};
+
+const POLYGON_FRAME = {
+    startDot: {radius: 18, borderWidth: 6},
+    lineWidth: 5,
+};
+
+const LINE = {
+    width: 15,
+};
 
 const pointStringFromMark = ({polygon, pos}) => relativePointsAsString(polygon, pos);
 const setPolygonPoints = polygonMark => node => node.setAttribute(
@@ -12,7 +25,7 @@ const setPolygonPoints = polygonMark => node => node.setAttribute(
 const definitionForAllShapes = [
     onChange(['color'], setStyleAttribute('--default-color')),
     onChange(['selectedColor'], setStyleAttribute('--selected-color')),
-    neverChange('shape', setAttribute('class')),
+    onChange(['locked'], l => setAttribute('class')('shape' + (l ? ' locked' : ''))),
 ];
 
 const createLineLikeShape = lineHeight => {
@@ -69,10 +82,10 @@ define(definitionFor, SHAPES.POLYGON, () => [
     }, setPolygonPoints),
 ]);
 
-define(definitionFor, SHAPES.LINE, () => createLineLikeShape(15));
+define(definitionFor, SHAPES.LINE, () => createLineLikeShape(LINE.WIDTH));
 
 define(definitionFor, SHAPES.WAVE, () => [
-    ...createLineLikeShape(pattern.height),
+    ...createLineLikeShape(WAVE_PATTERN.amplitude * 2),
     neverChange('shape wave', setAttribute('class'))
 ]);
 
@@ -99,8 +112,6 @@ define(definitionFor, 'label', () => [
 ]);
 
 const buildShape = createGeneric(identity);
-
-// define(buildShape, buildSvg(nodeNameOfShape(val.shape)))
 
 define(buildShape, SHAPES.RECTANGLE, () => buildSvg('rect'));
 define(buildShape, SHAPES.CIRCLE, () => buildSvg('g', {}, buildSvg('circle'), buildSvg('text')));
@@ -234,7 +245,7 @@ const acquireStatus = (root, newStatus, then) => root.status.acquire(newStatus, 
 const acquireGroupStatus = (root, name, group, proc) => acquireStatus(root, {name, group}, proc);
 
 const addGroupInteractionsFor = (root, group, node) => {
-    addEvent(node, 'mousedown', e => moveGroup(root, group, e).then(() => selectGroup(root, group)));
+    addEvent(node, 'mousedown', e => (group.mark.locked ? Promise.resolve() : moveGroup(root, group, e)).then(() => selectGroup(root, group)));
 };
 
 const attachGroup = (root, group) => {
@@ -334,7 +345,8 @@ const createPolygonFrame = (parent, start, finish) => {
     const finishDot = buildSvg('circle', {
         cx: start.x,
         cy: start.y,
-        r: 6,
+        r: POLYGON_FRAME.startDot.radius + 'px',
+        'stroke-width': POLYGON_FRAME.startDot.borderWidth + 'px',
         fill: 'lightblue',
         'class': 'polygon-start',
     });
@@ -342,7 +354,7 @@ const createPolygonFrame = (parent, start, finish) => {
         points: '',
         stroke: 'blue',
         'class': 'polygon-next-point',
-        'stroke-width': '2px',
+        'stroke-width': POLYGON_FRAME.lineWidth + 'px',
         fill: 'none',
     });
     const root = buildSvg('g', {'class': 'new-polygon'});
@@ -362,7 +374,7 @@ const createPolygonFrame = (parent, start, finish) => {
 };
 
 const wavePattern = () => {
-    const bounds = point(pattern.width, pattern.height);
+    const bounds = point(WAVE_PATTERN.lambda, WAVE_PATTERN.amplitude * 2);
     const c = multiplyPoint(0.5, bounds);
     const q = multiplyPoint(0.5, c);
     // 'M -1 11 Q 12.5 -5, 25 10 T 51 9'
@@ -373,7 +385,12 @@ const wavePattern = () => {
         width: `${bounds.x}px`,
         height: `${bounds.y}px`,
         patternUnits: "userSpaceOnUse",
-    }, buildSvg('path', {d: `M 0 ${c.y} Q ${q.x} -${q.y}, ${c.x} ${c.y} T ${bounds.x} ${c.y}`, fill: 'white', stroke: 'white'}));
+    }, buildSvg('path', {
+        d: `M -${c.x} ${c.y} Q -${q.x} -${q.y}, 0 ${c.y} t ${c.x} 0 t ${c.x} 0`,
+        fill: 'none',
+        stroke: 'white',
+        'stroke-width': WAVE_PATTERN.lineWidth + 'px',
+    }));
 };
 
 const waveMask = () => buildSvg('mask', {

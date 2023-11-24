@@ -1,4 +1,4 @@
-import { isNumber, arrayOf, isString, errorOnMismatch, isPoint, only, createGeneric, define, identity } from './utils';
+import { isNumber, arrayOf, isString, isBoolean, errorOnMismatch, isPoint, only, createGeneric, define, identity } from './utils';
 
 export const SHAPES = {
     CIRCLE: 'circle',
@@ -25,6 +25,7 @@ const expectedBase = {
     selectedColor: isString,
     shape: isShapeName,
     pos: isPoint,
+    locked: isBoolean,
 };
 
 const selectBase = object => ({
@@ -49,12 +50,13 @@ define(applyDefaults, SHAPES.CIRCLE, ({symbol = '', symbolColor = 'black', ...x}
  * @typedef {{x: number, y: number}} Point
  *
  * @typedef {{
- *     key: {string}
- *     label: {string}
- *     color: {string}
- *     selectedColor: {string}
- *     shape,: {string}
- *     pos: {Point}
+ *     key: {string},
+ *     label: {string},
+ *     color: {string},
+ *     selectedColor: {string},
+ *     shape,: {string},
+ *     pos: {Point},
+ *     locked: {boolean},
  * }} Mark
  *
  * @typedef {Mark & {width: number, height: number}} Rectangle
@@ -77,11 +79,12 @@ define(applyDefaults, SHAPES.CIRCLE, ({symbol = '', symbolColor = 'black', ...x}
  * @param {Point} object.pos
  * @param {string} [object.symbol]
  * @param {string} [object.symbolColor]
+ * @param {boolean} [object.locked]
  *
  * @return {Mark}
  */
 export default object => {
-    object = {...object, key: object.key || 'mark-' + Math.random().toString()};
+    object = {...object, key: object.key || 'mark-' + Math.random().toString(), locked: object.locked || false};
     errorOnMismatch(expectedBase, object);
     object = applyDefaults(object);
     errorOnMismatch(expectedShapes[object.shape], object);
