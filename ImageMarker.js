@@ -22,13 +22,13 @@ const setPolygonPoints = polygonMark => node => node.setAttribute(
     pointStringFromMark(polygonMark)
 );
 
-const definitionForAllShapes = [
+const definitionForAllShapes = classList => [
     onChange(['color'], setStyleAttribute('--default-color')),
     onChange(['selectedColor'], setStyleAttribute('--selected-color')),
-    onChange(['locked'], l => setAttribute('class')('shape' + (l ? ' locked' : ''))),
+    onChange(['locked'], l => setAttribute('class')(['shape'].concat(l ? ['locked'] : [], classList).join(' '))),
 ];
 
-const createLineLikeShape = lineHeight => {
+const createLineLikeShape = (lineHeight, classList) => {
     const offset = select => ({start, end}) => select(start, start + end);
     const vectorLength = point => Math.sqrt(Math.pow(point.x, 2) + Math.pow(point.y, 2));
 
@@ -42,7 +42,7 @@ const createLineLikeShape = lineHeight => {
     };
 
     return [
-        ...definitionForAllShapes,
+        ...definitionForAllShapes(classList),
         onChangeValues({start: ['pos'], end: ['end']}, compose(setStyleAttribute('transform'), transform)),
         onChange(['end'], compose(setAttribute('width'), vectorLength)),
         neverChange(`0 ${lineHeight / 2}px`, setStyleAttribute('transform-origin')),
@@ -55,7 +55,7 @@ const createLineLikeShape = lineHeight => {
 const definitionFor = createGeneric(val => val.shape || val);
 
 define(definitionFor, SHAPES.RECTANGLE, () => [
-    ...definitionForAllShapes,
+    ...definitionForAllShapes([]),
     onChange(['pos', 'x'], setAttribute('x')),
     onChange(['pos', 'y'], setAttribute('y')),
     onChange(['width'], setAttribute('width')),
@@ -63,7 +63,7 @@ define(definitionFor, SHAPES.RECTANGLE, () => [
 ]);
 
 define(definitionFor, SHAPES.CIRCLE, () => [
-    ...definitionForAllShapes,
+    ...definitionForAllShapes([]),
     onChange(['pos', 'x'], child(0, setAttribute('cx'))),
     onChange(['pos', 'y'], child(0, setAttribute('cy'))),
     onChange(['pos', 'x'], child(1, setAttribute('x'))),
@@ -75,20 +75,15 @@ define(definitionFor, SHAPES.CIRCLE, () => [
 ]);
 
 define(definitionFor, SHAPES.POLYGON, () => [
-    ...definitionForAllShapes,
+    ...definitionForAllShapes([]),
     onChangeValues({
         pos: ['pos'],
         polygon: ['polygon'],
     }, setPolygonPoints),
 ]);
 
-define(definitionFor, SHAPES.LINE, () => createLineLikeShape(LINE.width));
-
-define(definitionFor, SHAPES.WAVE, () => [
-    ...createLineLikeShape(WAVE_PATTERN.amplitude * 2),
-    neverChange('shape wave', setAttribute('class')),
-    onChange(['locked'], l => setAttribute('class')('shape wave' + (l ? ' locked' : ''))), 
-]);
+define(definitionFor, SHAPES.LINE, () => createLineLikeShape(LINE.width, []));
+define(definitionFor, SHAPES.WAVE, () => createLineLikeShape(WAVE_PATTERN.amplitude * 2, ['wave']));
 
 const child = (nr, proc) => v => node => proc(v)(node.children[nr]);
 
