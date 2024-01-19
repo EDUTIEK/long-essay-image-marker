@@ -71,7 +71,7 @@ define(definitionFor, SHAPES.CIRCLE, () => [
     onChange(['symbol'], child(1, setText())),
     onChange(['symbolColor'], child(1, setStyleAttribute('fill'))),
     neverChange('symbol', child(1, setAttribute('class'))),
-    neverChange(100, child(0, setAttribute('r'))),
+    neverChange(70, child(0, setAttribute('r'))),
 ]);
 
 define(definitionFor, SHAPES.POLYGON, () => [
@@ -95,7 +95,7 @@ define(definitionFor, 'label', () => [
     neverChange('label', child(1, setAttribute('class'))),
     onChangeValues({shape: ['shape'], label: ['label'], y: ['pos', 'y']}, ({shape, label, y}) => node => {
         if (shape == SHAPES.CIRCLE) {
-            y = y - 100;
+            y = y - 70;
         }
         setAttributes(node.children[1], {y});
         setText()(label)(node.children[1]);
