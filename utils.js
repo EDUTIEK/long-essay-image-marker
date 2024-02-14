@@ -114,12 +114,18 @@ export const tap = proc => x => {
     return x;
 };
 
-export const ignoreFirstCall = proc => {
-    let wrapper = () => {wrapper = proc;};
-    return (...args) => wrapper(...args);
-};
-
-export const ref = value => (newValue = undefined, guard = Void) => {
+/**
+ * This function creates a new reference.
+ * A reference can be be set to a new value and may contain a guard which checks, that the ref can only be set to valid values.
+ *
+ * @template A
+ * @typedef {(function(): A)|(function(A): void)} Ref<A>
+ *
+ * @param {A} value
+ * @param {function(A): void} guard
+ * @return Ref<A>
+ */
+export const ref = (value, guard = Void) => (newValue = undefined) => {
     if (isUndefined(newValue)) {
         return value;
     }

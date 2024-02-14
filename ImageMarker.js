@@ -443,10 +443,10 @@ define(mouseDown, ['draw-shape', SHAPES.POLYGON], (root, event) => acquireStatus
 }));
 
 const addInteractions = root => {
-    const isNotBackground = event => [root.nodes.svg, root.nodes.backgroundImage].includes(event.target);
+    const isBackground = event => [root.nodes.svg, root.nodes.backgroundImage].includes(event.target);
 
-    addEvent(root.nodes.svg, 'mousedown', onlyWhen(isNotBackground, e => mouseDown(root, e)));
-    addEvent(root.nodes.svg, ['mousedown', 'secondary'], onlyWhen(isNotBackground, e => moveView(root, e, 'secondary')));
+    addEvent(root.nodes.svg, 'mousedown', onlyWhen(isBackground, e => mouseDown(root, e)));
+    addEvent(root.nodes.svg, ['mousedown', 'secondary'], onlyWhen(isBackground, e => moveView(root, e, 'secondary')));
 };
 
 const creationColor = root => root.creation.color();
@@ -580,7 +580,7 @@ export default (parent, onCreation, onSelection) => {
         selectMark: key => selectMark(root, key),
         updateMark: mark => updateMark(root, createMark(mark)),
         setDefaultColor: color => root.creation.color(color),
-        setDefaultSelectedColor: shape => root.creation.selectedColor(shape),
+        setDefaultSelectedColor: color => root.creation.selectedColor(color),
         setDefaultShape: shape => root.creation.shape(shape),
         setZoomLevel,
         fitToPage: () => {
