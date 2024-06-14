@@ -357,7 +357,7 @@ const attachShape = (root, group) => {
  */
 const createThenEdit = edit => (root, event) => acquireStatus(root, {name: 'drawNew'}, release => {
     const mark = createMarkAtPoint(globalToSvgPoint(root, mousePoint(event)), creationShape(root), creationColor(root), creationSelectedColor(root));
-    root.emit.selectMark(null);
+    root.emit.selectMark(null, event);
     release();
     addMarkSilently(root, mark);
     edit(root, root.groups[mark.key], event).then(() => {
@@ -542,7 +542,7 @@ const relativeClick = (root, relativeTo, proc) => event => {
  */
 define(mouseDown, ['draw-shape', SHAPES.POLYGON], (root, event) => acquireStatus(root, {name: 'newPolygon'}, release => {
     event.preventDefault();
-    root.emit.selectMark(null);
+    root.emit.selectMark(null, event);
     const start = globalToSvgPoint(root, mousePoint(event));
     const updatePath = createPolygonFrame(root.nodes.layers.foreground, start, () => finish());
     const polygon = [point(0, 0)];
@@ -630,6 +630,24 @@ const selectGroup = (root, group) => acquireStatus(root, {name: 'selecting'}, re
 });
 
 /**
+ * Select a list of groups
+ *
+ * @param {Root} root
+ * @param {Group[]} groups
+ * @return {void}
+ */
+const selectGroups = (root, groups) => acquireStatus(root, {name: 'selecting'}, release => {
+    const foreground = [].slice.call(root.nodes.layers.foreground.children)
+        .forEach(node => node.classList.remove('active'));
+    moveChildren(root.nodes.layers.foreground, root.nodes.layers.normal);
+    for (const group of groups) {
+        group.nodes.root.classList.add('active');
+        add(root.nodes.layers.foreground, group.nodes.root);
+    }
+    release();
+});
+
+/**
  * Selects a group by it's key (and mark.key as well).
  *
  * @param {Root} root
@@ -637,6 +655,22 @@ const selectGroup = (root, group) => acquireStatus(root, {name: 'selecting'}, re
  * @return {void}
  */
 const selectMark = (root, key) => selectGroup(root, root.groups[key] || error(`Mark with key ${key} does not exist.`));
+
+/**
+ * Selects a list of groups by their keys (and mark keys as well).
+ *
+ * @param {Root} root
+ * @param {string[]} keys
+ * @return {void}
+ */
+const selectMarks = (root, keys) => {
+    let groups = [];
+    for (const key of keys) {
+        groups.push(root.groups[key] || error(`Mark with key ${key} does not exist.`));
+    }
+    selectGroups(root, groups);
+}
+
 
 /**
  * Adds a new mark without emitting a `createMark` event.
@@ -713,6 +747,7 @@ const globalToSvgPoint = (root, point) => multiplyPoint(
  *     addMark: {function(Mark): void},
  *     removeMark: {function(string): void},
  *     selectMark: {function(string): void},
+ *     selectMarks: {function(string): void},
  *     updateMark: {function(Mark): void},
  *     setDefaultColor: {function(string): void},
        setDefaultSelectedColor: {function(string): void},
@@ -732,7 +767,7 @@ export default (parent, onCreation, onSelection) => {
     const root = createRoot(
         parent,
         compose(onCreation, createMark),
-        compose(onSelection, unless(isNull, createMark))
+        (x, e) => onSelection(x ? createMark(x) : null, e)
     );
     addInteractions(root);
 
@@ -758,6 +793,7 @@ export default (parent, onCreation, onSelection) => {
         addMark: addMarkToCurrentRoot,
         removeMark,
         selectMark: key => selectMark(root, key),
+        selectMarks: keys => selectMarks(root, keys),
         updateMark: mark => updateMark(root, createMark(mark)),
         setDefaultColor: color => root.creation.color(color),
         setDefaultSelectedColor: color => root.creation.selectedColor(color),
