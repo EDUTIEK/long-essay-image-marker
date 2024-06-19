@@ -16,6 +16,8 @@ const LINE = {
     width: 15,
 };
 
+const SILENT = Symbol('silent');
+
 const pointStringFromMark = ({polygon, pos}) => relativePointsAsString(polygon, pos);
 
 /**
@@ -330,7 +332,10 @@ const acquireStatus = (root, newStatus, then) => root.status.acquire(newStatus, 
 const acquireGroupStatus = (root, name, group, proc) => acquireStatus(root, {name, group}, proc);
 
 const addGroupInteractionsFor = (root, group, node) => {
-    addEvent(node, 'mousedown', e => (group.mark.locked ? Promise.resolve() : moveGroup(root, group, e)).then(() => selectGroup(root, group)));
+    addEvent(node, 'mousedown', e => {
+        const promise = group.mark.locked ? Promise.resolve() : moveGroup(root, group, e);
+        return promise.then(() => selectGroups(root, [group]));
+    });
 };
 
 const attachGroup = (root, group) => {
@@ -359,10 +364,10 @@ const createThenEdit = edit => (root, event) => acquireStatus(root, {name: 'draw
     const mark = createMarkAtPoint(globalToSvgPoint(root, mousePoint(event)), creationShape(root), creationColor(root), creationSelectedColor(root));
     root.emit.selectMark(null, event);
     release();
-    addMarkSilently(root, mark);
+    addMark(root, mark, SILENT);
     edit(root, root.groups[mark.key], event).then(() => {
-        root.emit.createMark(root.groups[mark.key].mark);
-        selectMark(root, mark.key);
+        root.emit.createMark(root.groups[mark.key].mark, event);
+        selectMarks(root, [mark.key], event);
     });
 });
 
@@ -386,7 +391,7 @@ const mouseDown = createGeneric(rootMode);
  */
 const editLineLike = (root, group, event) => acquireGroupStatus(root, 'editGroup', group, release => untilMouseUp(root, event, {
     start: mouse => {
-        forceSelectSilently(root, group);
+        forceSelect(root, [group], SILENT);
         mouse = globalToSvgPoint(root, mouse);
         return {mark: group.mark, start: {mouse, pos: group.mark.pos}};
     },
@@ -409,7 +414,7 @@ define(mouseDown, ['draw-shape', SHAPES.WAVE], createThenEdit(editLineLike));
  */
 const editRectangle = (root, group, event) => acquireGroupStatus(root, 'editGroup', group, release => untilMouseUp(root, event, {
     start: mouse => {
-        forceSelectSilently(root, group);
+        forceSelect(root, [group], SILENT);
         mouse = globalToSvgPoint(root, mouse);
         return {mark: group.mark, start: {mouse, pos: group.mark.pos}};
     },
@@ -433,7 +438,7 @@ define(mouseDown, ['draw-shape', SHAPES.RECTANGLE], createThenEdit(editRectangle
 const moveGroup = (root, group, event) => acquireGroupStatus(root, 'moveGroup', group, release => untilMouseUp(root, event, {
     start: mouse => {
         mouse = globalToSvgPoint(root, mouse);
-        forceSelectSilently(root, group);
+        forceSelect(root, [group], SILENT);
         return {mark: group.mark, start: {pos: group.mark.pos, mouse}};
     },
     move: (mouse, {mark: oldMark, start}) => {
@@ -563,8 +568,8 @@ define(mouseDown, ['draw-shape', SHAPES.POLYGON], (root, event) => acquireStatus
     const finish = () => {
         callAll(toBeReleased);
         const mark = createPolygonMark(root, polygon, start);
-        addMark(root, mark);
-        selectMark(root, mark.key);
+        addMark(root, mark, event);
+        selectMarks(root, [mark.key], event);
     };
 }));
 
@@ -601,104 +606,73 @@ const moveView = (root, event, button = 'primary') => acquireStatus(root, {name:
 define(mouseDown, 'scroll', moveView);
 
 /**
- * This function selects the given group without emitting the correspomding `select` event and ignoring if there is currently a process ongoing.
+ * This function selects the given group, ignoring if there is currently a process ongoing.
  * This function should be used for groups that are currently created and not in the `root.groups` map and for processes when a node should be visible selected to the user but the event call should be posponed.
  *
- * @param {Root} root
- * @param {Group} group
- * @return {void}
- */
-const forceSelectSilently = (root, group) => {
-    const foreground = [].slice.call(root.nodes.layers.foreground.children)
-          .forEach(node => node.classList.remove('active'));
-    moveChildren(root.nodes.layers.foreground, root.nodes.layers.normal);
-    group.nodes.root.classList.add('active');
-    add(root.nodes.layers.foreground, group.nodes.root);
-};
-
-/**
- * Main function to select a group.
- *
- * @param {Root} root
- * @param {Group} group
- * @return {void}
- */
-const selectGroup = (root, group) => acquireStatus(root, {name: 'selecting'}, release => {
-    forceSelectSilently(root, group);
-    root.emit.selectMark(group.mark);
-    release();
-});
-
-/**
- * Select a list of groups
+ * An event is emitted when the event argument is not `SILENT`.
  *
  * @param {Root} root
  * @param {Group[]} groups
+ * @param {Event|Symbol} event
  * @return {void}
  */
-const selectGroups = (root, groups) => acquireStatus(root, {name: 'selecting'}, release => {
+const forceSelect = (root, groups, event) => {
     const foreground = [].slice.call(root.nodes.layers.foreground.children)
-        .forEach(node => node.classList.remove('active'));
+          .forEach(node => node.classList.remove('active'));
     moveChildren(root.nodes.layers.foreground, root.nodes.layers.normal);
-    for (const group of groups) {
-        group.nodes.root.classList.add('active');
-        add(root.nodes.layers.foreground, group.nodes.root);
+    groups.forEach(group => {
+        const node = group.nodes.root;
+        node.classList.add('active');
+        add(root.nodes.layers.foreground, node);
+    });
+    if (event !== SILENT) {
+        groups.forEach(group => root.emit.selectMark(group.mark, event));
     }
+};
+
+/**
+ * Select a list of groups.
+ *
+ * @param {Root} root
+ * @param {Group[]} groups
+ * @param {Event|Symbol} event
+ * @return {void}
+ */
+const selectGroups = (root, groups, event) => acquireStatus(root, {name: 'selecting-multiple'}, release => {
+    forceSelect(root, groups, event);
     release();
 });
 
-/**
- * Selects a group by it's key (and mark.key as well).
- *
- * @param {Root} root
- * @param {string} key
- * @return {void}
- */
-const selectMark = (root, key) => selectGroup(root, root.groups[key] || error(`Mark with key ${key} does not exist.`));
+const requireMark = (root, key) => root.groups[key] || error(`Mark with key ${key} does not exist.`);
 
 /**
  * Selects a list of groups by their keys (and mark keys as well).
  *
  * @param {Root} root
  * @param {string[]} keys
+ * @param {Event|Symbol} event
  * @return {void}
  */
-const selectMarks = (root, keys) => {
-    let groups = [];
-    for (const key of keys) {
-        groups.push(root.groups[key] || error(`Mark with key ${key} does not exist.`));
-    }
-    selectGroups(root, groups);
-}
-
+const selectMarks = (root, keys, event) => selectGroups(root, keys.map(k => requireMark(root, k)), event);
 
 /**
- * Adds a new mark without emitting a `createMark` event.
- * This is used when a mark is created but still edited by the user.
- * In that case the event is postponed until the user finished editing this mark.
+ * Main function to add a new mark. A corresponding group is created by this.
+ * To prevent an event to be emitted use `SILENT` for the event argument.
  *
  * @param {Root} root
  * @param {Mark} mark
+ * @param {Event|Symbol} event
  * @return {void}
  */
-const addMarkSilently = (root, mark) => {
+const addMark = (root, mark, event) => {
     assert(!root.groups[mark.key], `Duplicated key: ${mark.key}`);
 
     const group = groupFromMark(mark);
     attachGroup(root, group);
     root.groups[mark.key] = group;
-};
-
-/**
- * Main function to add a new mark. A corresponding group is created by this.
- *
- * @param {Root} root
- * @param {Mark} mark
- * @return {void}
- */
-const addMark = (root, mark) => {
-    addMarkSilently(root, mark);
-    root.emit.createMark(mark);
+    if(event !== SILENT) {
+        root.emit.createMark(mark, event);
+    }
 };
 
 /**
@@ -710,8 +684,7 @@ const addMark = (root, mark) => {
  * @return {void}
  */
 const updateMark = (root, mark) => {
-    assert(root.groups[mark.key], `Mark with key ${mark.key} does not exist.`);
-    const group = root.groups[mark.key];
+    const group = requireMark(root, mark.key);
     const changes = pathDiff(group.mark, mark);
     group.mark = mark;
     if (memberInChanges(['shape'], changes)) {
@@ -759,19 +732,19 @@ const globalToSvgPoint = (root, point) => multiplyPoint(
  * }} ImageMarker
  *
  * @param {HTMLElement} parent
- * @param {function(Mark): any} onCreation
- * @param {function(?Mark): any} onSelection
+ * @param {function(Mark, Event): any} onCreation
+ * @param {function(?Mark, Event): any} onSelection
  * @return ImageMarker
  */
 export default (parent, onCreation, onSelection) => {
     const root = createRoot(
         parent,
-        compose(onCreation, createMark),
+        (x, e) => onCreation(createMark(x), e),
         (x, e) => onSelection(x ? createMark(x) : null, e)
     );
     addInteractions(root);
 
-    const addMarkToCurrentRoot = mark => addMark(root, createMark(mark));
+    const addMarkToCurrentRoot = mark => addMark(root, createMark(mark), SILENT);
     const removeMark = key => {
         root.groups[key].nodes.root.remove();
         remove(root.groups, key);
@@ -792,8 +765,8 @@ export default (parent, onCreation, onSelection) => {
         },
         addMark: addMarkToCurrentRoot,
         removeMark,
-        selectMark: key => selectMark(root, key),
-        selectMarks: keys => selectMarks(root, keys),
+        selectMark: key => selectMarks(root, [key], SILENT),
+        selectMarks: keys => selectMarks(root, keys, SILENT),
         updateMark: mark => updateMark(root, createMark(mark)),
         setDefaultColor: color => root.creation.color(color),
         setDefaultSelectedColor: color => root.creation.selectedColor(color),
