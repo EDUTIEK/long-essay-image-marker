@@ -13,7 +13,7 @@ const POLYGON_FRAME = {
 };
 
 const LINE = {
-    width: 15,
+    width: 25,
 };
 
 const SILENT = Symbol('silent');
