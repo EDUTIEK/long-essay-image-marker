@@ -2,18 +2,18 @@ import createMark, { SHAPES } from './Mark';
 import { compose, fitInRect, mousePoint, subtractPoint, addPoint, set, remove, tap, error, point, rectFromPoints, relativePointsAsString, ref, pointAsSize, sizeAsPoint, multiplyPoint, isNumber, size, assert, rotatePoint, define, createGeneric, callAll, onChange, setStyleAttribute, neverChange, setAttribute, buildSvg, buildNode, add, createStatus, addEvent, onlyWhen, loadImage, setAttributes, applyDef, updateDef, setText, onChangeValues, moveChildren, willFollowMouseDown, mouseFlow, pathDiff, memberInChanges, isNull, unless, identity } from './utils';
 
 const WAVE_PATTERN = {
-    lambda: 60,
-    amplitude: 20,
-    lineWidth: 10,
+    lambda: 30,
+    amplitude: 6,
+    lineWidth: 6,
 };
 
 const POLYGON_FRAME = {
-    startDot: {radius: 20, borderWidth: 10},
-    lineWidth: 10,
+    startDot: {radius: 20, borderWidth: 6},
+    lineWidth: 6,
 };
 
 const LINE = {
-    width: 25,
+    width: 6,
 };
 
 const SILENT = Symbol('silent');
@@ -107,16 +107,29 @@ define(definitionFor, 'label', () => [
     //onChange(['pos', 'y'], child(1, setAttribute('y'))),
     neverChange('label', child(0, setAttribute('class'))),
     neverChange('label', child(1, setAttribute('class'))),
-    onChangeValues({shape: ['shape'], label: ['label'], y: ['pos', 'y']}, ({shape, label, y}) => node => {
+    onChangeValues({shape: ['shape'], label: ['label'], y: ['pos', 'y'], x: ['pos', 'x']}, ({shape, label, y, x}) => node => {
         if (shape == SHAPES.CIRCLE) {
             y = y - 70;
+            x = x + 20;
+        } else {
+            y = y - 17;
+            x = x + 20;
         }
-        setAttributes(node.children[1], {y});
+        setAttributes(node.children[1], {x, y});
         setText()(label)(node.children[1]);
         requestAnimationFrame(() => {
+            // width and height of the text
             const {width, height} = node.children[1].getBBox();
-            setAttributes(node.children[0], {y: y - height + (height * 0.15), width, height});
-
+            if (label) {
+                setAttributes(node.children[0], {width: width + 40});
+                setAttributes(node.children[0], {height: height + 15});
+            } else {
+                setAttributes(node.children[0], {width: 0});
+                setAttributes(node.children[0], {height: 0});
+            }
+            setAttributes(node.children[0], {y: y - height});
+            setAttributes(node.children[0], {rx: 10});
+            setAttributes(node.children[0], {ry: 10});
         });
     }),
 ]);
