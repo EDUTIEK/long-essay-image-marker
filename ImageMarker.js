@@ -82,7 +82,7 @@ define(definitionFor, SHAPES.CIRCLE, () => [
     onChange(['symbol'], child(1, setText())),
     onChange(['symbolColor'], child(1, setStyleAttribute('fill'))),
     neverChange('symbol', child(1, setAttribute('class'))),
-    neverChange(70, child(0, setAttribute('r'))),
+    neverChange(40, child(0, setAttribute('r'))),
 ]);
 
 define(definitionFor, SHAPES.POLYGON, () => [
@@ -109,11 +109,11 @@ define(definitionFor, 'label', () => [
     neverChange('label', child(1, setAttribute('class'))),
     onChangeValues({shape: ['shape'], label: ['label'], y: ['pos', 'y'], x: ['pos', 'x']}, ({shape, label, y, x}) => node => {
         if (shape == SHAPES.CIRCLE) {
-            y = y - 70;
+            y = y - 50;
             x = x + 20;
         } else {
-            y = y - 17;
-            x = x + 20;
+            y = y - 15;
+            x = x + 15;
         }
         setAttributes(node.children[1], {x, y});
         setText()(label)(node.children[1]);
@@ -121,8 +121,8 @@ define(definitionFor, 'label', () => [
             // width and height of the text
             const {width, height} = node.children[1].getBBox();
             if (label) {
-                setAttributes(node.children[0], {width: width + 40});
-                setAttributes(node.children[0], {height: height + 15});
+                setAttributes(node.children[0], {width: width + 30});
+                setAttributes(node.children[0], {height: height + 10});
             } else {
                 setAttributes(node.children[0], {width: 0});
                 setAttributes(node.children[0], {height: 0});
